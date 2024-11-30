@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Business Card Scanner</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        
+        .upload-area {
+            border: 2px dashed #ccc;
+            padding: 20px;
+            text-align: center;
+            margin: 20px 0;
+            cursor: pointer;
+            min-height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f9f9f9;
+        }
+        
+        .upload-area:hover {
+            background: #f0f0f0;
+            border-color: #999;
+        }
+        
+        .preview {
+            max-width: 300px;
+            margin: 20px auto;
+        }
+        
+        .preview img {
+            max-width: 100%;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 5px;
+        }
+        
+        .result {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f5f5f5;
+            border-radius: 4px;
+        }
+        
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+    <h1>Business Card Scanner</h1>
+    
+    <div class="upload-area" id="uploadArea">
+        <p>Drop a business card image here or click to select</p>
+        <input type="file" id="fileInput" accept="image/*" style="display: none">
+    </div>
+    
+    <div class="preview" id="preview" style="display: none">
+        <h3>Preview:</h3>
+        <img id="previewImage" src="">
+    </div>
+    
+    <div class="result" id="result" style="display: none">
+        <h3>Extracted Information:</h3>
+        <pre id="extractedData"></pre>
+    </div>
+
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const preview = document.getElementById('preview');
+        const previewImage = document.getElementById('previewImage');
+        const result = document.getElementById('result');
+        const extractedData = document.getElementById('extractedData');
+
+        // Handle click to upload
+        uploadArea.addEventListener('click', (e) => {
+            console.log('Upload area clicked');
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            console.log('File selected:', e.target.files);
+            if (e.target.files && e.target.files[0]) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        // Handle drag and drop
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.style.backgroundColor = '#f0f0f0';
+        });
+
+        uploadArea.addEventListener('dragleave', (e) => {
+            uploadArea.style.backgroundColor = '';
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.style.backgroundColor = '';
+            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            if (!file || !file.type.startsWith('image/')) {
+                alert('Please upload an image file');
+                return;
+            }
+
+            console.log('Processing file:', file.name);
+
+            // Show preview
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                previewImage.src = e.target.result;
+                preview.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+
+            // Upload and process
+            const formData = new FormData();
+            formData.append('card', file);
+
+            extractedData.textContent = 'Processing...';
+            result.style.display = 'block';
+
+            fetch('http://localhost:3000/api/scan-card', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Received data:', data);
+                extractedData.textContent = JSON.stringify(data, null, 2);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                extractedData.textContent = 'Error processing image: ' + error.message;
+            });
+        }
+    </script>
+</body>
+</html>

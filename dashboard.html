@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Contact Manager Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .voice-btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .voice-btn.recording {
+            background: #dc3545;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 20px;
+        }
+        .contact-list {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .contact-card {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+        }
+        .contact-card:hover {
+            background: #f8f9fa;
+        }
+        .contact-card.active {
+            background: #e9ecef;
+        }
+        .details-panel {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid #dee2e6;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+        }
+        .tab.active {
+            border-bottom-color: #007bff;
+            color: #007bff;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .note-card, .task-card {
+            padding: 15px;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        #status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            border-radius: 4px;
+            display: none;
+        }
+        #status.recording {
+            display: block;
+            background: #dc3545;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Contact Manager</h1>
+            <button id="voiceCommand" class="voice-btn">Start Voice Command</button>
+        </div>
+        
+        <div id="status">Recording...</div>
+
+        <div class="grid">
+            <div class="contact-list">
+                <h2>Contacts</h2>
+                <div id="contactsList">
+                    <!-- Contacts will be loaded here -->
+                </div>
+            </div>
+
+            <div class="details-panel">
+                <div id="contactDetails">
+                    <h2 id="contactName">Select a contact</h2>
+                    <p id="contactInfo"></p>
+
+                    <div class="tabs">
+                        <div class="tab active" data-tab="notes">Notes</div>
+                        <div class="tab" data-tab="tasks">Tasks</div>
+                    </div>
+
+                    <div class="tab-content active" id="notesContent">
+                        <!-- Notes will be loaded here -->
+                    </div>
+
+                    <div class="tab-content" id="tasksContent">
+                        <!-- Tasks will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let recognition;
+        let selectedContactId = null;
+        
+        // Initialize speech recognition
+        if ('webkitSpeechRecognition' in window) {
+            recognition = new webkitSpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            
+            recognition.onstart = function() {
+                document.getElementById('status').className = 'recording';
+                document.getElementById('voiceCommand').classList.add('recording');
+            };
+            
+            recognition.onresult = function(event) {
+                const transcript = event.results[0][0].transcript;
+                handleVoiceCommand(transcript);
+            };
+            
+            recognition.onend = function() {
+                document.getElementById('status').className = '';
+                document.getElementById('voiceCommand').classList.remove('recording');
+            };
+        }
+
+        // Load contacts
+        function loadContacts() {
+            fetch('http://localhost:3000/api/contacts')
+                .then(response => response.json())
+                .then(contacts => {
+                    const contactsList = document.getElementById('contactsList');
+                    contactsList.innerHTML = contacts.map(contact => `
+                        <div class="contact-card" data-id="${contact.id}">
+                            <strong>${contact.first_name} ${contact.last_name}</strong><br>
+                            <small>${contact.company}</small>
+                        </div>
+                    `).join('');
+
+                    // Add click handlers
+                    document.querySelectorAll('.contact-card').forEach(card => {
+                        card.onclick = () => loadContactDetails(card.dataset.id);
+                    });
+                });
+        }
+
+        // Load contact details
+        function loadContactDetails(contactId) {
+            selectedContactId = contactId;
+            
+            // Update active state
+            document.querySelectorAll('.contact-card').forEach(card => {
+                card.classList.toggle('active', card.dataset.id === contactId);
+            });
+
+            // Load contact info
+            fetch(`http://localhost:3000/api/contacts/${contactId}/details`)
+                .then(response => response.json())
+                .then(data => {
+                    const contact = data.contact;
+                    document.getElementById('contactName').textContent = 
+                        `${contact.first_name} ${contact.last_name}`;
+                    document.getElementById('contactInfo').innerHTML = `
+                        <strong>${contact.title}</strong> at ${contact.company}<br>
+                        ${contact.email}<br>
+                        ${contact.phone}
+                    `;
+
+                    // Load notes
+                    const notesHtml = data.interactions.map(note => `
+                        <div class="note-card">
+                            <strong>${new Date(note.date).toLocaleDateString()}</strong>
+                            <p>${note.notes}</p>
+                        </div>
+                    `).join('') || '<p>No notes yet</p>';
+                    document.getElementById('notesContent').innerHTML = notesHtml;
+
+                    // Load tasks
+                    const tasksHtml = data.tasks.map(task => `
+                        <div class="task-card">
+                            <strong>${task.title}</strong>
+                            <p>${task.description || ''}</p>
+                            <small>Due: ${new Date(task.due_date).toLocaleDateString()}</small>
+                        </div>
+                    `).join('') || '<p>No tasks yet</p>';
+                    document.getElementById('tasksContent').innerHTML = tasksHtml;
+                });
+        }
+
+        // Handle voice commands
+        function handleVoiceCommand(transcript) {
+            fetch('http://localhost:3000/api/voice-commands', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    command: 'addNote',
+                    transcript: transcript
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (selectedContactId) {
+                    loadContactDetails(selectedContactId);
+                }
+            });
+        }
+
+        // Tab switching
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.onclick = () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                
+                tab.classList.add('active');
+                document.getElementById(`${tab.dataset.tab}Content`).classList.add('active');
+            };
+        });
+
+        // Voice command button
+        document.getElementById('voiceCommand').onclick = function() {
+            if (recognition) {
+                recognition.start();
+            } else {
+                alert('Speech recognition is not supported in this browser. Please use Chrome.');
+            }
+        };
+
+        // Initial load
+        loadContacts();
+    </script>
+</body>
+</html>

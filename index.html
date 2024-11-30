@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Contact Manager - Voice Commands</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 20px auto; padding: 20px; }
+        button { padding: 10px 20px; font-size: 16px; margin: 10px 0; }
+        #status { margin: 20px 0; padding: 10px; border-radius: 4px; }
+        .recording { background-color: #ffe6e6; }
+        #transcription { margin: 20px 0; padding: 10px; background: #f5f5f5; min-height: 50px; }
+        #result { margin: 20px 0; padding: 10px; background: #e6ffe6; }
+    </style>
+</head>
+<body>
+    <h1>Contact Manager Voice Commands</h1>
+    
+    <button id="startRecording">Start Voice Command</button>
+    
+    <div id="status">Status: Ready</div>
+    
+    <div>
+        <h3>Transcription:</h3>
+        <div id="transcription"></div>
+    </div>
+    
+    <div>
+        <h3>Result:</h3>
+        <div id="result"></div>
+    </div>
+
+    <div>
+        <h3>Try saying:</h3>
+        <ul>
+            <li>"Add note for John from Test Corp that we discussed the new project"</li>
+            <li>"Create task for John to follow up next week"</li>
+        </ul>
+    </div>
+
+    <script>
+        let recognition;
+        
+        if ('webkitSpeechRecognition' in window) {
+            recognition = new webkitSpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            
+            recognition.onstart = function() {
+                document.getElementById('status').textContent = 'Status: Listening...';
+                document.getElementById('status').className = 'recording';
+            };
+            
+            recognition.onresult = function(event) {
+                const transcript = event.results[0][0].transcript;
+                document.getElementById('transcription').textContent = transcript;
+                
+                // Parse command
+                parseCommand(transcript);
+            };
+            
+            recognition.onerror = function(event) {
+                document.getElementById('status').textContent = 'Error: ' + event.error;
+            };
+            
+            recognition.onend = function() {
+                document.getElementById('status').textContent = 'Status: Ready';
+                document.getElementById('status').className = '';
+            };
+        }
+
+        function parseCommand(transcript) {
+            // Simple command parsing
+            const addNoteRegex = /add note for (.+?) from (.+?) that (.+)/i;
+            const match = transcript.match(addNoteRegex);
+            
+            if (match) {
+                const [_, contactName, company, content] = match;
+                
+                // Send to API
+                fetch('http://localhost:3000/api/voice-commands', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        command: 'addNote',
+                        contactName,
+                        company,
+                        content
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('result').textContent = 
+                        'Added note for ' + contactName + ': ' + content;
+                })
+                .catch(error => {
+                    document.getElementById('result').textContent = 
+                        'Error: ' + error.message;
+                });
+            }
+        }
+
+        document.getElementById('startRecording').onclick = function() {
+            if (recognition) {
+                recognition.start();
+            } else {
+                alert('Speech recognition is not supported in this browser. Please use Chrome.');
+            }
+        };
+    </script>
+</body>
+</html>

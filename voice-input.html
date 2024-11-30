@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Voice Input - Contact Manager</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+
+        .voice-control {
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .record-btn {
+            background-color: #4CAF50;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 25px;
+            font-size: 18px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .record-btn.recording {
+            background-color: #f44336;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .status {
+            margin: 15px 0;
+            font-size: 16px;
+            color: #666;
+        }
+
+        .transcription {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            min-height: 100px;
+        }
+
+        .result {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            display: none;
+        }
+
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+    <h1>Voice Input - Contact Manager</h1>
+    
+    <div class="voice-control">
+        <button id="recordBtn" class="record-btn">Start Recording</button>
+        <div id="status" class="status"></div>
+    </div>
+
+    <div id="transcription" class="transcription">
+        <h3>Transcription:</h3>
+        <p id="transcriptionText"></p>
+    </div>
+
+    <div id="result" class="result">
+        <h3>Extracted Information:</h3>
+        <pre id="extractedData"></pre>
+    </div>
+
+    <script>
+        const recordBtn = document.getElementById('recordBtn');
+        const status = document.getElementById('status');
+        const transcriptionText = document.getElementById('transcriptionText');
+        const result = document.getElementById('result');
+        const extractedData = document.getElementById('extractedData');
+    
+        let recognition;
+        if ('webkitSpeechRecognition' in window) {
+            console.log('Web Speech API is supported');
+            recognition = new webkitSpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.lang = 'en-US';
+    
+            recognition.onstart = () => {
+                console.log('Recognition started');
+                status.textContent = 'Listening...';
+                recordBtn.textContent = 'Stop Recording';
+                recordBtn.classList.add('recording');
+            };
+    
+            recognition.onerror = (event) => {
+                console.error('Recognition error:', event.error);
+                status.textContent = 'Error: ' + event.error;
+            };
+    
+            recognition.onresult = async (event) => {
+                console.log('Got result:', event.results);
+                const transcript = event.results[0][0].transcript;
+                transcriptionText.textContent = transcript;
+                
+                try {
+                    const response = await fetch('http://localhost:3000/api/voice-input', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text: transcript })
+                    });
+                    const data = await response.json();
+                    extractedData.textContent = JSON.stringify(data, null, 2);
+                    result.style.display = 'block';
+                } catch (error) {
+                    console.error('Fetch error:', error);
+                    status.textContent = 'Error: ' + error.message;
+                }
+            };
+    
+            recognition.onend = () => {
+                console.log('Recognition ended');
+                recordBtn.textContent = 'Start Recording';
+                recordBtn.classList.remove('recording');
+                status.textContent = 'Ready to record';
+            };
+    
+            recordBtn.addEventListener('click', () => {
+                console.log('Button clicked');
+                try {
+                    if (recognition && !recognition.recognizing) {
+                        console.log('Starting recognition');
+                        recognition.start();
+                    } else {
+                        console.log('Stopping recognition');
+                        recognition.stop();
+                    }
+                } catch (error) {
+                    console.error('Recognition error:', error);
+                    status.textContent = 'Error: ' + error.message;
+                }
+            });
+        } else {
+            console.error('Web Speech API not supported');
+            status.textContent = 'Error: Speech recognition not supported in this browser. Please use Chrome.';
+            recordBtn.disabled = true;
+        }
+    </script>
+</body>
+</html>
