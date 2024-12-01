@@ -120,7 +120,7 @@
                 transcriptionText.textContent = transcript;
                 
                 try {
-                    const response = await fetch('http://localhost:3000/api/voice-input', {
+                    const response = await fetch('https://contact-manager-ynox.onrender.com/api/voice-input', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ text: transcript })
