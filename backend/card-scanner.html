@@ -55,6 +55,49 @@
             border-radius: 4px;
             border: 1px solid #ddd;
         }
+
+        .success-message {
+            background-color: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+        }
+
+        .error-message {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+        }
+
+        .actions {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .extracted-data {
+            background: white;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+        }
+
+        .btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .btn:hover {
+            background: #45a049;
+        }
     </style>
 </head>
 <body>
@@ -120,8 +163,6 @@
                 return;
             }
 
-            console.log('Processing file:', file.name);
-
             // Show preview
             const reader = new FileReader();
             reader.onload = (e) => {
@@ -130,12 +171,13 @@
             };
             reader.readAsDataURL(file);
 
+            // Show loading state
+            extractedData.textContent = 'Processing image...';
+            result.style.display = 'block';
+
             // Upload and process
             const formData = new FormData();
             formData.append('card', file);
-
-            extractedData.textContent = 'Processing...';
-            result.style.display = 'block';
 
             fetch('https://contact-manager-ynox.onrender.com/api/scan-card', {
                 method: 'POST',
@@ -143,12 +185,34 @@
             })
             .then(response => response.json())
             .then(data => {
-                console.log('Received data:', data);
-                extractedData.textContent = JSON.stringify(data, null, 2);
+                // Show the extracted and saved information
+                const resultHtml = `
+                    <div class="success-message">Contact saved successfully!</div>
+                    <div class="extracted-data">
+                        <h4>Extracted Information:</h4>
+                        <pre>${JSON.stringify(data.extracted, null, 2)}</pre>
+                    </div>
+                    <div class="actions">
+                        <button onclick="window.location.href='/dashboard'" class="btn">
+                            View All Contacts
+                        </button>
+                        <button onclick="window.location.reload()" class="btn">
+                            Scan Another
+                        </button>
+                    </div>
+                `;
+                extractedData.innerHTML = resultHtml;
             })
             .catch(error => {
                 console.error('Error:', error);
-                extractedData.textContent = 'Error processing image: ' + error.message;
+                extractedData.innerHTML = `
+                    <div class="error-message">
+                        Error processing image: ${error.message}
+                    </div>
+                    <button onclick="window.location.reload()" class="btn">
+                        Try Again
+                    </button>
+                `;
             });
         }
     </script>
