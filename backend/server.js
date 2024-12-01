@@ -214,10 +214,97 @@ app.post('/api/contacts', async (req, res) => {
     }
 });
 
+// Get all contacts with search functionality
 app.get('/api/contacts', async (req, res) => {
     try {
-        const result = await pool.query('SELECT * FROM contacts ORDER BY created_at DESC');
-        res.json(result.rows);
+        const { search } = req.query;
+        let query = 'SELECT * FROM contacts';
+        
+        if (search) {
+            query += ` WHERE 
+                first_name ILIKE $1 OR 
+                last_name ILIKE $1 OR 
+                company ILIKE $1 OR 
+                email ILIKE $1`;
+            const result = await pool.query(query, [`%${search}%`]);
+            res.json(result.rows);
+        } else {
+            const result = await pool.query(query + ' ORDER BY created_at DESC');
+            res.json(result.rows);
+        }
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Get single contact with their interactions
+app.get('/api/contacts/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const contact = await pool.query('SELECT * FROM contacts WHERE id = $1', [id]);
+        const interactions = await pool.query(
+            'SELECT * FROM interactions WHERE contact_id = $1 ORDER BY date DESC',
+            [id]
+        );
+        
+        if (contact.rows.length === 0) {
+            return res.status(404).json({ error: 'Contact not found' });
+        }
+        
+        res.json({
+            ...contact.rows[0],
+            interactions: interactions.rows
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Update contact
+app.put('/api/contacts/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { first_name, last_name, company, title, email, phone } = req.body;
+        
+        const result = await pool.query(
+            `UPDATE contacts 
+            SET first_name = $1, last_name = $2, company = $3, 
+                title = $4, email = $5, phone = $6, 
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = $7 
+            RETURNING *`,
+            [first_name, last_name, company, title, email, phone, id]
+        );
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Contact not found' });
+        }
+        
+        res.json(result.rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Delete contact
+app.delete('/api/contacts/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        // First delete related interactions
+        await pool.query('DELETE FROM interactions WHERE contact_id = $1', [id]);
+        
+        // Then delete the contact
+        const result = await pool.query(
+            'DELETE FROM contacts WHERE id = $1 RETURNING *',
+            [id]
+        );
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Contact not found' });
+        }
+        
+        res.json({ message: 'Contact deleted successfully' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
