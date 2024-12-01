@@ -253,7 +253,7 @@ app.get('/scan', (req, res) => {
     res.sendFile(__dirname + '/card-scanner.html');
 });
 
-const PORT = 3000;
+cconst PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
