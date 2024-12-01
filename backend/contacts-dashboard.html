@@ -146,50 +146,51 @@
         const contactsPerPage = 10;
 
         async function loadContacts() {
-            try {
-                console.log('Fetching contacts...');
-                const response = await fetch('https://contact-manager-ynox.onrender.com/api/contacts');
-                console.log('Response:', response);
-                const contacts = await response.json();
-                console.log('Contacts loaded:', contacts);
-                
-                const tbody = document.getElementById('contactsList');
-                if (contacts.length === 0) {
-                    tbody.innerHTML = `
-                        <tr>
-                            <td colspan="7" style="text-align: center; padding: 20px;">
-                                No contacts found
-                            </td>
-                        </tr>
-                    `;
-                } else {
-                    tbody.innerHTML = contacts.map(contact => `
-                        <tr>
-                            <td>${contact.first_name || ''} ${contact.last_name || ''}</td>
-                            <td>${contact.company || ''}</td>
-                            <td>${contact.title || ''}</td>
-                            <td>${contact.email || ''}</td>
-                            <td>${contact.phone || ''}</td>
-                            <td>${new Date(contact.created_at).toLocaleDateString()}</td>
-                            <td class="action-btns">
-                                <button class="btn view-btn" onclick="viewContact(${contact.id})">View</button>
-                                <button class="btn edit-btn" onclick="editContact(${contact.id})">Edit</button>
-                                <button class="btn delete-btn" onclick="deleteContact(${contact.id})">Delete</button>
-                            </td>
-                        </tr>
-                    `).join('');
-                }
-            } catch (error) {
-                console.error('Error loading contacts:', error);
-                document.getElementById('contactsList').innerHTML = `
-                    <tr>
-                        <td colspan="7" style="text-align: center; padding: 20px; color: red;">
-                            Error loading contacts: ${error.message}
-                        </td>
-                    </tr>
-                `;
-            }
+    try {
+        console.log('Fetching contacts...');
+        const response = await fetch('https://contact-manager-ynox.onrender.com/api/contacts');
+        const data = await response.json();
+        console.log('Response data:', data);
+        
+        const contacts = data.contacts || []; // Get contacts array from response
+        const tbody = document.getElementById('contactsList');
+
+        if (!contacts || contacts.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" style="text-align: center; padding: 20px;">
+                        No contacts found
+                    </td>
+                </tr>
+            `;
+        } else {
+            tbody.innerHTML = contacts.map(contact => `
+                <tr>
+                    <td>${contact.first_name || ''} ${contact.last_name || ''}</td>
+                    <td>${contact.company || ''}</td>
+                    <td>${contact.title || ''}</td>
+                    <td>${contact.email || ''}</td>
+                    <td>${contact.phone || ''}</td>
+                    <td>${new Date(contact.created_at).toLocaleDateString()}</td>
+                    <td class="action-btns">
+                        <button class="btn view-btn" onclick="viewContact(${contact.id})">View</button>
+                        <button class="btn edit-btn" onclick="editContact(${contact.id})">Edit</button>
+                        <button class="btn delete-btn" onclick="deleteContact(${contact.id})">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
         }
+    } catch (error) {
+        console.error('Error loading contacts:', error);
+        document.getElementById('contactsList').innerHTML = `
+            <tr>
+                <td colspan="7" style="text-align: center; padding: 20px; color: red;">
+                    Error loading contacts: ${error.message}
+                </td>
+            </tr>
+        `;
+    }
+}
 
         // Add this function to handle refreshing
         function refreshContacts() {

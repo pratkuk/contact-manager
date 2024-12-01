@@ -201,6 +201,72 @@ app.post('/api/scan-card', upload.single('card'), async (req, res) => {
     }
 });
 
+app.post('/api/scan-card', upload.single('card'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No image uploaded' });
+        }
+
+        const imageBuffer = fs.readFileSync(req.file.path);
+        const base64Image = imageBuffer.toString('base64');
+        
+        // Get extracted data from Claude
+        const message = await anthropic.messages.create({
+            model: "claude-3-haiku-20240307",
+            max_tokens: 1024,
+            messages: [{
+                role: "user",
+                content: [
+                    {
+                        type: "text",
+                        text: "Extract contact information from this image in JSON format with these fields: full_name, title, company, email, phone, website"
+                    },
+                    {
+                        type: "image",
+                        source: {
+                            type: "base64",
+                            media_type: req.file.mimetype,
+                            data: base64Image
+                        }
+                    }
+                ]
+            }]
+        });
+
+        // Parse the extracted data
+        const extractedData = JSON.parse(message.content[0].text);
+
+        // Save to database
+        const nameParts = extractedData.full_name.split(' ');
+        const firstName = nameParts[0];
+        const lastName = nameParts.slice(1).join(' ');
+
+        const result = await pool.query(
+            `INSERT INTO contacts (first_name, last_name, title, company, email, phone, website) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7) 
+             RETURNING *`,
+            [firstName, lastName, extractedData.title, extractedData.company, 
+             extractedData.email, extractedData.phone, extractedData.website]
+        );
+
+        // Return both extracted and saved data
+        res.json({
+            extracted: extractedData,
+            saved: result.rows[0],
+            message: 'Contact saved successfully'
+        });
+
+        // Clean up uploaded file
+        fs.unlink(req.file.path, (err) => {
+            if (err) console.error('Error deleting file:', err);
+        });
+
+    } catch (error) {
+        console.error('Full error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 app.post('/api/contacts', async (req, res) => {
     try {
         const { first_name, last_name, company, title, email, phone } = req.body;
@@ -215,24 +281,28 @@ app.post('/api/contacts', async (req, res) => {
 });
 
 // Get all contacts with search functionality
+// Get all contacts with search functionality
 app.get('/api/contacts', async (req, res) => {
     try {
         const { search } = req.query;
         let query = 'SELECT * FROM contacts';
         
+        let result;
         if (search) {
             query += ` WHERE 
                 first_name ILIKE $1 OR 
                 last_name ILIKE $1 OR 
                 company ILIKE $1 OR 
                 email ILIKE $1`;
-            const result = await pool.query(query, [`%${search}%`]);
-            res.json(result.rows);
+            result = await pool.query(query, [`%${search}%`]);
         } else {
-            const result = await pool.query(query + ' ORDER BY created_at DESC');
-            res.json(result.rows);
+            result = await pool.query(query + ' ORDER BY created_at DESC');
         }
+
+        console.log('Contacts query result:', result.rows); // Debug log
+        res.json({ contacts: result.rows }); // Wrap in an object
     } catch (err) {
+        console.error('Database error:', err);
         res.status(500).json({ error: err.message });
     }
 });
