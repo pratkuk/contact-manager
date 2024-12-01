@@ -246,6 +246,10 @@ app.get('/api/contacts/:id/details', async (req, res) => {
 });
 
 app.get('/dashboard', (req, res) => {
+    res.sendFile(__dirname + '/contacts-dashboard.html');
+});
+
+app.get('/dashboard', (req, res) => {
     res.sendFile(__dirname + '/dashboard.html');
 });
 
